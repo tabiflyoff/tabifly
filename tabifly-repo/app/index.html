@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Tabifly — Compagnon Voyageur</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+  :root{
+    --coral:#FF5A46; --coral-dark:#E8452F; --coral-light:#FFF0ED;
+    --ink:#1B2233; --gray:#8A93A6; --gray-light:#F4F5F7;
+    --line:#ECEDF1; --green:#1FBE7C; --amber:#FF9B3D; --white:#FFFFFF;
+    --grad: linear-gradient(135deg, #FF7A59 0%, #FF5A46 50%, #E8452F 100%);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Inter',sans-serif; background:#0D0F14; color:var(--ink);
+    min-height:100vh; display:flex; justify-content:center; padding:40px 20px;
+  }
+  .phone{
+    width:100%; max-width:400px; background:var(--white); border-radius:36px;
+    border:8px solid #14161C; overflow:hidden; display:flex; flex-direction:column;
+    min-height:760px; box-shadow:0 30px 70px rgba(0,0,0,0.55); position:relative;
+  }
+  .notch{ position:absolute; top:0; left:50%; transform:translateX(-50%); width:120px; height:20px; background:#14161C; border-bottom-left-radius:14px; border-bottom-right-radius:14px; z-index:5; }
+  .topbar{ padding:30px 20px 16px; display:flex; align-items:center; justify-content:space-between; background:var(--white); }
+  .topbar-left{ display:flex; align-items:center; gap:10px; }
+  .logo-mark{ width:34px; height:34px; border-radius:10px; background:var(--grad); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .topbar h1{ font-family:'Baloo 2',sans-serif; font-size:19px; font-weight:700; color:var(--ink); }
+  .topbar .sub{ font-size:11.5px; color:var(--gray); margin-top:1px; }
+  .bell{ width:36px; height:36px; border-radius:50%; background:var(--gray-light); display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+  .content{ flex:1; padding:4px 20px 16px; overflow-y:auto; background:var(--gray-light); }
+  .screen{ display:none; }
+  .screen.active{ display:block; }
+
+  .card{ background:var(--white); border:1px solid var(--line); border-radius:18px; padding:18px; margin-bottom:14px; box-shadow:0 2px 10px rgba(20,20,30,0.03); }
+  label{ font-family:'Inter',sans-serif; font-size:10.5px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--gray); display:block; margin-bottom:6px; }
+  input, select{
+    width:100%; background:var(--gray-light); border:1px solid var(--line); border-radius:12px;
+    color:var(--ink); padding:12px 14px; font-size:14px; margin-bottom:12px; font-family:'Inter',sans-serif;
+  }
+  input:last-child{ margin-bottom:0; }
+  button{
+    background:var(--grad); color:var(--white); border:none; border-radius:14px;
+    padding:13px 16px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif;
+    box-shadow:0 6px 16px rgba(255,90,70,0.28);
+  }
+  button.secondary{ background:var(--gray-light); box-shadow:none; border:1px solid var(--line); color:var(--ink); font-weight:600; }
+  button.full{ width:100%; }
+  button:disabled{ opacity:0.45; cursor:not-allowed; box-shadow:none; }
+
+  .row{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .row:last-child{ margin-bottom:0; }
+  .row .k{ font-size:12px; color:var(--gray); }
+  .row .v{ font-family:'Baloo 2',sans-serif; font-size:15px; font-weight:700; color:var(--ink); }
+  .status-pill{ display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:0.02em; padding:4px 10px; border-radius:20px; background:rgba(31,190,124,0.1); color:var(--green); }
+  .status-pill.alert{ background:rgba(255,90,70,0.1); color:var(--coral); }
+
+  .section-title{ font-family:'Inter',sans-serif; font-size:11px; font-weight:700; letter-spacing:0.03em; text-transform:uppercase; color:var(--gray); margin:20px 4px 10px; }
+  .section-title:first-child{ margin-top:4px; }
+
+  /* Home */
+  .hero{ background:var(--grad); border:none; color:var(--white); }
+  .hero .k{ color:rgba(255,255,255,0.85); }
+  .hero .flight{ font-family:'Baloo 2',sans-serif; font-size:21px; font-weight:700; color:var(--white); }
+  .hero .flightno{ font-size:11.5px; color:rgba(255,255,255,0.85); margin-top:2px; }
+  .hero .status-pill{ background:rgba(255,255,255,0.22); color:var(--white); }
+
+  /* List rows, à la Airalo (icône + libellé + chevron) */
+  .list-row{ display:flex; align-items:center; gap:12px; background:var(--white); border:1px solid var(--line); border-radius:16px; padding:13px 14px; margin-bottom:10px; cursor:pointer; box-shadow:0 2px 10px rgba(20,20,30,0.03); }
+  .list-row .ico-badge{ width:38px; height:38px; border-radius:11px; background:var(--coral-light); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+  .list-row .label{ flex:1; font-size:14px; font-weight:600; color:var(--ink); }
+  .list-row .chev{ color:var(--gray); font-size:15px; }
+  .list-row .meta{ font-size:11.5px; color:var(--gray); margin-top:1px; }
+  .unread-dot{ min-width:19px; height:19px; padding:0 5px; border-radius:10px; background:var(--coral); color:var(--white); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; margin-right:2px; }
+
+  .quick-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .quick{ background:var(--white); border:1px solid var(--line); border-radius:16px; padding:14px; font-size:12.5px; font-weight:700; text-align:center; cursor:pointer; box-shadow:0 2px 10px rgba(20,20,30,0.03); color:var(--ink); }
+  .quick .n{ font-family:'Baloo 2',sans-serif; font-size:19px; display:block; margin-bottom:5px; color:var(--coral); }
+
+  /* Checklist */
+  .check-item{ display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); }
+  .check-item:last-child{ border-bottom:none; }
+  .check-item input[type=checkbox]{ width:19px; height:19px; margin:0; accent-color:var(--coral); flex-shrink:0; }
+  .check-item span{ font-size:13.5px; flex:1; color:var(--ink); }
+  .check-item.done span{ color:var(--gray); text-decoration:line-through; }
+  .add-row{ display:flex; gap:8px; margin-top:12px; }
+  .add-row input{ margin-bottom:0; }
+  .progress-bar{ height:7px; background:var(--gray-light); border-radius:4px; overflow:hidden; margin-bottom:14px; }
+  .progress-fill{ height:100%; background:var(--grad); transition:width 0.3s; }
+
+  /* Account */
+  .avatar{ width:56px; height:56px; border-radius:50%; background:var(--grad); color:var(--white); display:flex; align-items:center; justify-content:center; font-family:'Baloo 2',sans-serif; font-weight:700; font-size:20px; margin-bottom:12px; }
+
+  .log{ font-family:'Inter',sans-serif; font-size:10.5px; color:var(--gray); max-height:100px; overflow-y:auto; margin-top:10px; }
+  .log div{ padding:4px 0; border-bottom:1px solid var(--line); }
+  .note{ font-size:11.5px; color:var(--gray); line-height:1.6; margin-top:10px; }
+
+  .navbar{ display:flex; justify-content:space-around; padding:12px 0 20px; border-top:1px solid var(--line); background:var(--white); }
+  .navitem{ display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; }
+  .navitem .ico{ font-size:19px; opacity:0.4; filter:grayscale(1); }
+  .navitem.active .ico{ opacity:1; filter:none; }
+  .navlabel{ font-size:9.5px; color:var(--gray); font-family:'Inter',sans-serif; font-weight:600; letter-spacing:0.01em; }
+  .navitem.active .navlabel{ color:var(--coral); font-weight:700; }
+
+  /* Bannière publicitaire */
+  .ad-banner{ background:var(--gray-light); border:1px dashed var(--line); border-radius:14px; padding:12px; text-align:center; margin-top:6px; margin-bottom:6px; }
+  .ad-banner .ad-label{ font-size:9px; letter-spacing:0.08em; text-transform:uppercase; color:var(--gray); margin-bottom:4px; }
+  .ad-banner .ad-content{ font-size:12px; color:var(--gray); font-style:italic; }
+
+  /* Flight hero visual (inspiré du repère avion / route) */
+  .flight-hero-visual{ background:var(--grad); text-align:center; padding:26px 18px 22px; }
+  .fh-circle{ width:96px; height:96px; border-radius:50%; background:rgba(255,255,255,0.9); display:flex; align-items:center; justify-content:center; margin:0 auto 22px; box-shadow:0 8px 20px rgba(0,0,0,0.15); }
+  .fh-plane{ font-size:36px; display:inline-block; transform:rotate(45deg); }
+  .fh-route{ display:flex; align-items:center; justify-content:center; gap:0; margin:0 auto 6px; max-width:220px; }
+  .fh-dot{ width:11px; height:11px; border-radius:50%; border:2px solid var(--white); background:transparent; flex-shrink:0; }
+  .fh-dot-end{ background:var(--white); }
+  .fh-line{ flex:1; height:2px; background:rgba(255,255,255,0.6); }
+  .fh-codes{ display:flex; justify-content:space-between; max-width:220px; margin:0 auto 16px; font-size:11px; font-weight:700; letter-spacing:0.05em; color:rgba(255,255,255,0.85); }
+  .fh-times{ font-family:'Baloo 2',sans-serif; font-size:26px; font-weight:700; color:var(--white); }
+  .fh-times .fh-arrow{ font-size:18px; opacity:0.8; margin:0 6px; }
+
+  /* Fil de vol partagé */
+  .fv-msg{ background:var(--white); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:10px; }
+  .fv-msg-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+  .fv-pseudo{ font-size:11.5px; font-weight:700; color:var(--coral); }
+  .fv-time{ font-size:10.5px; color:var(--gray); }
+  .fv-text{ font-size:13.5px; color:var(--ink); line-height:1.4; }
+  .fv-report{ font-size:10.5px; color:var(--gray); margin-top:6px; cursor:pointer; text-decoration:underline; }
+
+  /* Page Premium */
+  .premium-hero{ background:linear-gradient(160deg, #2A2540 0%, #1B1830 60%, #0D0C1A 100%); border:none; text-align:center; padding:30px 20px 26px; position:relative; overflow:hidden; }
+  .premium-hero::before{ content:''; position:absolute; top:-40%; left:-20%; width:160%; height:160%; background:radial-gradient(circle at 30% 20%, rgba(255,138,90,0.35), transparent 55%); pointer-events:none; }
+  .premium-badge{ display:inline-block; font-size:11px; font-weight:700; letter-spacing:0.12em; color:#FFD9BA; background:rgba(255,138,90,0.18); border:1px solid rgba(255,138,90,0.4); padding:5px 12px; border-radius:20px; margin-bottom:14px; position:relative; }
+  .trial-badge{ display:inline-block; font-size:11.5px; font-weight:700; color:#1B2233; background:var(--green); padding:6px 14px; border-radius:20px; margin-bottom:14px; margin-left:6px; position:relative; }
+  .premium-headline{ font-family:'Baloo 2',sans-serif; font-size:24px; font-weight:700; color:var(--white); margin-bottom:8px; position:relative; }
+  .premium-sub{ font-size:12.5px; color:rgba(255,255,255,0.75); line-height:1.6; max-width:280px; margin:0 auto; position:relative; }
+
+  .premium-feature{ display:flex; gap:12px; align-items:flex-start; background:var(--white); border:1px solid var(--line); border-radius:14px; padding:13px 14px; margin-bottom:9px; box-shadow:0 2px 10px rgba(20,20,30,0.03); }
+  .pf-ico{ width:34px; height:34px; border-radius:10px; background:var(--coral-light); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .pf-title{ font-size:13.5px; font-weight:700; color:var(--ink); margin-bottom:2px; }
+  .pf-desc{ font-size:11.5px; color:var(--gray); line-height:1.4; }
+
+  .plan-toggle{ display:flex; background:var(--gray-light); border-radius:14px; padding:4px; margin-bottom:14px; gap:4px; }
+  .plan-opt{ flex:1; text-align:center; padding:10px; border-radius:11px; font-size:12.5px; font-weight:700; color:var(--gray); cursor:pointer; }
+  .plan-opt.active{ background:var(--white); color:var(--ink); box-shadow:0 2px 8px rgba(20,20,30,0.08); }
+  .plan-badge{ background:var(--green); color:var(--white); font-size:9px; padding:2px 6px; border-radius:8px; margin-left:4px; }
+  .plan-price{ font-family:'Baloo 2',sans-serif; font-size:32px; font-weight:700; color:var(--ink); }
+  .plan-price span{ font-size:14px; font-weight:600; color:var(--gray); }
+
+  /* Récompenses / badges */
+  .badge-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .badge-card{ background:var(--white); border:1px solid var(--line); border-radius:16px; padding:14px 10px; text-align:center; box-shadow:0 2px 10px rgba(20,20,30,0.03); }
+  .badge-card.locked{ opacity:0.45; }
+  .badge-ico{ font-size:28px; margin-bottom:8px; }
+  .badge-name{ font-size:12px; font-weight:700; color:var(--ink); margin-bottom:3px; line-height:1.25; }
+  .badge-req{ font-size:10px; color:var(--gray); line-height:1.3; }
+  .badge-card{ cursor:pointer; }
+
+  .badge-modal-overlay{ position:absolute; inset:0; background:rgba(13,15,20,0.55); display:flex; align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .badge-modal{ background:var(--white); border-radius:20px; padding:26px 22px; text-align:center; max-width:280px; box-shadow:0 20px 50px rgba(0,0,0,0.3); }
+  .badge-modal-ico{ font-size:44px; margin-bottom:12px; }
+  .badge-modal-name{ font-family:'Baloo 2',sans-serif; font-size:18px; font-weight:700; color:var(--ink); margin-bottom:8px; }
+  .badge-modal-detail{ font-size:13px; color:var(--gray); line-height:1.5; margin-bottom:18px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo-mark">✈️</div>
+      <div>
+        <h1 id="topbarTitle">Tabifly</h1>
+        <div class="sub" id="topbarSub">Ton compagnon de voyage</div>
+      </div>
+    </div>
+    <div class="bell">🔔</div>
+  </div>
+
+  <div class="content">
+
+    <!-- ACCUEIL -->
+    <div class="screen active" id="screen-accueil">
+      <div class="card hero">
+        <div class="row"><span class="k">Prochain vol</span><span class="status-pill" id="home-status">Non renseigné</span></div>
+        <div class="flight" id="home-flight">Ajoute ton vol</div>
+        <div class="flightno" id="home-flightno">Onglet Voyage →</div>
+      </div>
+
+      <div class="section-title">Accès rapide</div>
+      <div class="quick-grid">
+        <div class="quick" onclick="goTo('voyage')"><span class="n">✈️</span>Suivre mon vol</div>
+        <div class="quick" onclick="goTo('checklist')"><span class="n" id="home-check-n">0/0</span>Checklist départ</div>
+      </div>
+
+      <div class="section-title">Alertes voyage</div>
+      <div class="card" style="border-left:3px solid var(--amber);">
+        <div class="row"><span class="k">Météo destination</span><span class="v" style="font-size:13px;">Ensoleillé, 24°C</span></div>
+      </div>
+      <div class="card" style="border-left:3px solid var(--green);">
+        <div class="row"><span class="k">Trafic aérien</span><span class="v" style="font-size:13px;">Aucune perturbation signalée</span></div>
+      </div>
+      <div class="note">Module à connecter à un flux réel (météo, grèves, sécurité) en V2 — pour le MVP, ces cartes illustrent le principe.</div>
+
+      <div class="ad-banner">
+        <div class="ad-label">Publicité</div>
+        <div class="ad-content">Espace bannière — ex : assurance voyage, carte Wise/Revolut</div>
+      </div>
+    </div>
+
+    <!-- COMPTE -->
+    <div class="screen" id="screen-compte">
+      <button class="secondary" onclick="goTo('plus')" style="margin-bottom:14px;">← Retour</button>
+      <div class="card">
+        <div class="avatar" id="avatarInitial">?</div>
+        <label>Nom</label>
+        <input type="text" id="acc-name" placeholder="Ilies" />
+        <label>Email</label>
+        <input type="text" id="acc-email" placeholder="toi@exemple.com" />
+        <button class="full" id="acc-save">Enregistrer</button>
+      </div>
+      <div class="section-title">Préférences</div>
+      <div class="card">
+        <div class="note">Notifications push, langue, unité de distance — à brancher en V2. Pour le MVP, ce module valide juste le principe d'un espace profil séparé du suivi de vol.</div>
+      </div>
+      <div class="section-title">Abonnement</div>
+      <div class="card" id="premium-card" style="background:var(--grad); border:none; color:var(--white);">
+        <div class="row"><span class="k" style="color:rgba(255,255,255,0.85);">Statut</span><span class="v" id="premium-status" style="color:var(--white);">Gratuit (avec pub)</span></div>
+        <div class="note" style="color:rgba(255,255,255,0.85); margin-bottom:12px;">Le Premium retire la pub et débloque le Fil de vol, la Traduction et le mode hors ligne.</div>
+        <button class="full secondary" id="premium-toggle-btn" style="background:var(--white); color:var(--coral-dark);">Passer en Premium (démo — 4,99€/mois)</button>
+        <button class="full secondary" onclick="goTo('premium')" style="background:transparent; border:1px solid rgba(255,255,255,0.5); color:var(--white); margin-top:8px;">Voir la page Premium</button>
+      </div>
+      <div class="section-title">Sauvegarde</div>
+      <div class="card">
+        <div class="row"><span class="k">Statut de synchronisation</span><span class="v" id="sync-status" style="font-size:12.5px;">—</span></div>
+        <div class="note">Checklist, dépenses et profil sont sauvegardés automatiquement sur ton compte, même si tu fermes l'app.</div>
+      </div>
+
+      <div class="section-title">Zone sensible</div>
+      <div class="card" style="border-color:rgba(255,90,70,0.3);">
+        <button class="full" id="delete-account-btn" style="background:var(--white); color:var(--coral); border:1px solid var(--coral);">Supprimer mon compte et mes données</button>
+        <div class="note">Supprime définitivement ton profil, ta checklist, ton budget et l'historique de tes vols. Action irréversible — exigée par les règles du Play Store pour toute app avec compte utilisateur.</div>
+      </div>
+    </div>
+
+    <!-- VOYAGE -->
+    <div class="screen" id="screen-voyage">
+      <div class="card flight-hero-visual hidden" id="flight-hero" style="display:none;">
+        <div class="fh-circle"><span class="fh-plane">✈️</span></div>
+        <div class="fh-route">
+          <div class="fh-dot fh-dot-start"></div>
+          <div class="fh-line"></div>
+          <div class="fh-dot fh-dot-end"></div>
+        </div>
+        <div class="fh-codes">
+          <span id="fh-origin">CDG</span>
+          <span id="fh-dest">JFK</span>
+        </div>
+        <div class="fh-times"><span id="fh-dep">13:06</span> <span class="fh-arrow">→</span> <span id="fh-arr">16:59</span></div>
+      </div>
+
+      <div class="card" id="setup-card">
+        <label>Numéro de vol</label>
+        <input type="text" id="flightNo" placeholder="ex: AF006" />
+        <label>Date du vol</label>
+        <input type="date" id="flightDate" />
+        <label>Clé API AeroDataBox (RapidAPI) — optionnel</label>
+        <input type="text" id="apiKey" placeholder="laisse vide pour tester en mode simulation" />
+        <button class="full" id="startBtn">Suivre ce vol</button>
+        <div class="note">Sans clé API : mode simulation (porte factice qui change après ~3 vérifications) pour tester la logique de notification.</div>
+      </div>
+
+      <div class="card hidden" id="flight-card" style="display:none;">
+        <div class="row"><span class="k">Vol</span><span class="v" id="fc-flight">—</span></div>
+        <div class="row"><span class="k">Statut</span><span class="status-pill" id="fc-status">—</span></div>
+        <div class="row"><span class="k">Terminal</span><span class="v" id="fc-terminal">—</span></div>
+        <div class="row"><span class="k">Porte</span><span class="v" id="fc-gate">—</span></div>
+        <div class="row"><span class="k">Heure embarquement</span><span class="v" id="fc-time">—</span></div>
+      </div>
+
+      <div class="card hidden" id="position-card" style="display:none;">
+        <label>Où es-tu dans le terminal ?</label>
+        <select id="position">
+          <option value="0">Contrôle sûreté (juste passé)</option>
+          <option value="4">Zone A — Restaurants</option>
+          <option value="7">Zone B — Boutiques</option>
+          <option value="10">Zone C — Duty free</option>
+          <option value="2">Salle d'embarquement</option>
+        </select>
+        <div class="row" style="margin-top:12px;">
+          <span class="k">Temps de marche estimé</span>
+          <span class="v" id="walkTime">— min</span>
+        </div>
+      </div>
+
+      <div class="card hidden" id="log-card" style="display:none;">
+        <label>Journal des vérifications</label>
+        <div class="log" id="log"></div>
+        <button class="secondary full" id="checkNowBtn" style="margin-top:10px;">Vérifier maintenant</button>
+      </div>
+
+      <button class="full secondary" onclick="goTo('correspondances')" style="margin-top:4px;">🔁 Gérer mes correspondances</button>
+    </div>
+
+    <!-- BAGAGES -->
+    <div class="screen" id="screen-bagages">
+      <button class="secondary" onclick="goTo('plus')" style="margin-bottom:14px;">← Retour</button>
+      <div class="card">
+        <label>Photo du bagage</label>
+        <div id="luggage-preview-wrap" style="margin-bottom:12px;"></div>
+        <input type="file" id="luggage-photo" accept="image/*" capture="environment" style="display:none;" />
+        <button class="full secondary" id="luggage-photo-btn">📷 Prendre / choisir une photo du bagage</button>
+      </div>
+
+      <div class="card">
+        <label>Photo du tag bagage</label>
+        <div id="tag-preview-wrap" style="margin-bottom:12px;"></div>
+        <input type="file" id="tag-photo" accept="image/*" capture="environment" style="display:none;" />
+        <button class="full secondary" id="tag-photo-btn">🏷️ Prendre / choisir une photo du tag</button>
+      </div>
+
+      <div class="card">
+        <div class="row"><span class="k">Statut</span><span class="v" id="luggage-status">Non enregistré</span></div>
+        <div class="note">Ces deux photos sont conservées pour ton dossier en cas de bagage perdu ou endommagé : elles servent de preuve (apparence du bagage) et de référence de suivi (numéro du tag lisible). Idéalement, ce module se connecte à un service de type Lost &amp; Found aéroportuaire pour un rapprochement automatique en cas de signalement.</div>
+      </div>
+    </div>
+
+    <!-- PLUS (hub) -->
+    <div class="screen" id="screen-plus">
+      <div class="section-title">Tous les modules</div>
+      <div class="list-row" onclick="goTo('documents')"><div class="ico-badge">📄</div><div class="label">Documents de voyage</div><div class="chev">›</div></div>
+      <div class="list-row" onclick="goTo('budget')"><div class="ico-badge">💱</div><div class="label">Devise &amp; budget</div><div class="chev">›</div></div>
+      <div class="list-row" onclick="goTo('traduction')"><div class="ico-badge">🗣️</div><div class="label">Traduction</div><div class="chev">›</div></div>
+      <div class="list-row" onclick="goTo('bagages')"><div class="ico-badge">🧳</div><div class="label">Bagages</div><div class="chev">›</div></div>
+      <div class="list-row" onclick="goTo('compte')"><div class="ico-badge">👤</div><div class="label">Compte</div><div class="chev">›</div></div>
+      <div class="list-row" onclick="goTo('filvol')"><div class="ico-badge">💬</div><div class="label">Fil de vol partagé</div><span class="unread-dot" id="unread-filvol" style="display:none;"></span><div class="chev">›</div></div>
+      <div class="list-row" onclick="goTo('recompenses')"><div class="ico-badge">🏅</div><div class="label">Récompenses</div><span class="unread-dot" id="unread-recompenses" style="display:none;"></span><div class="chev">›</div></div>
+    </div>
+
+    <!-- DOCUMENTS DE VOYAGE -->
+    <div class="screen" id="screen-documents">
+      <button class="secondary" onclick="goTo('plus')" style="margin-bottom:14px;">← Retour</button>
+      <div class="card">
+        <label>Ajouter un document (passeport, visa, assurance, réservation...)</label>
+        <input type="file" id="doc-file" accept="image/*,application/pdf" style="display:none;" />
+        <button class="full secondary" id="doc-add-btn">📎 Ajouter un document</button>
+      </div>
+      <div class="section-title">Mes documents</div>
+      <div id="documents-list"></div>
+      <div class="note">Stockés localement pour être consultables même sans connexion à l'aéroport ou à l'étranger.</div>
+    </div>
+
+    <!-- DEVISE ET BUDGET -->
+    <div class="screen" id="screen-budget">
+      <button class="secondary" onclick="goTo('plus')" style="margin-bottom:14px;">← Retour</button>
+      <div class="card">
+        <label>Convertisseur</label>
+        <div style="display:flex; gap:8px;">
+          <input type="number" id="fx-amount" placeholder="100" value="100" style="flex:1;" />
+          <select id="fx-currency" style="flex:1;">
+            <option value="USD">EUR → USD</option>
+            <option value="GBP">EUR → GBP</option>
+            <option value="JPY">EUR → JPY</option>
+            <option value="CAD">EUR → CAD</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <span class="k">Résultat</span>
+          <span class="v" id="fx-result">—</span>
+        </div>
+        <div class="note" id="fx-note">Taux en temps réel via l'API Frankfurter (mise à jour quotidienne, source BCE).</div>
+      </div>
+
+      <div class="section-title">Dépenses du voyage</div>
+      <div class="card">
+        <div class="row" style="margin-bottom:10px;">
+          <span class="k">Total dépensé</span>
+          <span class="v" id="budget-total">0 €</span>
+        </div>
+        <div id="budget-list"></div>
+        <div class="add-row">
+          <input type="text" id="budget-label" placeholder="Libellé" style="flex:2;" />
+          <input type="number" id="budget-amount" placeholder="€" style="flex:1;" />
+          <button id="budget-add-btn">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CORRESPONDANCES -->
+    <div class="screen" id="screen-correspondances">
+      <button class="secondary" onclick="goTo('plus')" style="margin-bottom:14px;">← Retour</button>
+      <div id="corr-list"></div>
+      <div class="card">
+        <label>Numéro de vol de correspondance</label>
+        <input type="text" id="corr-flightno" placeholder="ex: AF1234" />
+        <label>Date</label>
+        <input type="date" id="corr-date" />
+        <button class="full" id="corr-add-btn">Ajouter cette correspondance</button>
+      </div>
+    </div>
+
+    <!-- TRADUCTION -->
+    <div class="screen" id="screen-traduction">
+      <button class="secondary" onclick="goTo('plus')" style="margin-bottom:14px;">← Retour</button>
+      <div id="traduction-locked" class="card" style="text-align:center; display:none;">
+        <div style="font-size:32px; margin-bottom:8px;">🔒</div>
+        <div style="font-weight:700; margin-bottom:6px;">Fonctionnalité Premium</div>
+        <div class="note" style="margin-bottom:14px;">La traduction pour demander son chemin fait partie de l'offre Premium.</div>
+        <button class="full" onclick="goTo('premium')">Voir l'offre Premium</button>
+      </div>
+      <div id="traduction-content">
+        <div class="card">
+          <label>Langue</label>
+          <select id="tr-lang">
+            <option value="en">Anglais</option>
+            <option value="es">Espagnol</option>
+            <option value="it">Italien</option>
+            <option value="de">Allemand</option>
+          </select>
+          <label>Porte (optionnel, pour la phrase "où est ma porte")</label>
+          <input type="text" id="tr-gate" placeholder="ex: B34" />
+        </div>
+        <div class="section-title">Montrer cette phrase</div>
+        <div id="tr-phrases"></div>
+      </div>
+    </div>
+
+    <!-- FIL DE VOL PARTAGÉ -->
+    <div class="screen" id="screen-filvol">
+      <button class="secondary" onclick="goTo('plus')" style="margin-bottom:14px;">← Retour</button>
+
+      <div id="filvol-locked" class="card" style="text-align:center; display:none;">
+        <div style="font-size:32px; margin-bottom:8px;">🔒</div>
+        <div style="font-weight:700; margin-bottom:6px;">Fonctionnalité Premium</div>
+        <div class="note" style="margin-bottom:14px;">Le fil de vol partagé fait partie de l'offre Premium.</div>
+        <button class="full" onclick="goTo('premium')">Voir l'offre Premium</button>
+      </div>
+
+      <div id="filvol-content">
+        <div class="card" style="background:var(--coral-light); border:none;">
+          <div class="note" style="margin-top:0; color:var(--coral-dark); line-height:1.6;">
+            <b>Règles du fil :</b><br>
+            • Anonyme — tu apparais sous un pseudo de passager, pas ton nom.<br>
+            • Public uniquement — pas de message privé entre deux personnes.<br>
+            • Le fil disparaît automatiquement après l'atterrissage.<br>
+            • Ne partage jamais de numéro de téléphone ou de réseau social — c'est filtré automatiquement.<br>
+            • Signale tout message inapproprié en un tap.
+          </div>
+        </div>
+
+        <div class="card" style="background:var(--gray-light); border:none;">
+          <div class="row"><span class="k">Fil rattaché au vol</span><span class="v" id="fv-flightno" style="font-size:14px;">—</span></div>
+        </div>
+
+        <div id="fv-messages"></div>
+
+        <div class="card">
+          <div class="add-row">
+            <input type="text" id="fv-input" placeholder="Partager une info avec le vol..." style="flex:1;" />
+            <button id="fv-send-btn">Envoyer</button>
+          </div>
+          <div class="note" id="fv-warning" style="color:var(--coral); display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE PREMIUM -->
+    <div class="screen" id="screen-premium">
+      <button class="secondary" onclick="goTo('compte')" style="margin-bottom:14px;">← Retour</button>
+
+      <div class="card premium-hero">
+        <div class="premium-badge">✦ PREMIUM</div>
+        <div class="trial-badge">🎁 Essai gratuit de 7 jours</div>
+        <div class="premium-headline">Voyage sans limites</div>
+        <div class="premium-sub">Toute l'app, sans pub, avec les outils qui comptent quand ça compte vraiment.</div>
+      </div>
+
+      <div class="section-title">Ce que tu débloques</div>
+      <div class="premium-feature"><div class="pf-ico">🚫</div><div><div class="pf-title">Zéro publicité</div><div class="pf-desc">Une expérience fluide, sans bannière, du début à la fin.</div></div></div>
+      <div class="premium-feature"><div class="pf-ico">💬</div><div><div class="pf-title">Fil de vol partagé</div><div class="pf-desc">Échange en direct avec les autres passagers de ton vol.</div></div></div>
+      <div class="premium-feature"><div class="pf-ico">🗣️</div><div><div class="pf-title">Traduction illimitée</div><div class="pf-desc">Demande ton chemin dans n'importe quelle langue, à tout moment.</div></div></div>
+      <div class="premium-feature"><div class="pf-ico">📶</div><div><div class="pf-title">Mode hors ligne</div><div class="pf-desc">Checklist, budget et documents restent accessibles même sans réseau.</div></div></div>
+
+      <div class="section-title">Choisis ta formule</div>
+      <div class="plan-toggle">
+        <div class="plan-opt active" id="plan-monthly" onclick="selectPlan('monthly')">Mensuel</div>
+        <div class="plan-opt" id="plan-yearly" onclick="selectPlan('yearly')">Annuel <span class="plan-badge">-33%</span></div>
+      </div>
+
+      <div class="card" style="text-align:center;">
+        <div class="plan-price" id="plan-price">4,99€<span>/mois</span></div>
+        <div class="note" id="plan-note" style="margin-top:2px; margin-bottom:16px;">7 jours offerts, puis sans engagement</div>
+        <button class="full" id="premium-cta-btn">Démarrer l'essai gratuit</button>
+      </div>
+
+      <div class="note" style="text-align:center; margin-top:4px;">Paiement sécurisé via Google Play. Ce prototype simule l'activation sans paiement réel.</div>
+    </div>
+
+    <!-- RÉCOMPENSES -->
+    <div class="screen" id="screen-recompenses">
+      <button class="secondary" onclick="goTo('plus')" style="margin-bottom:14px;">← Retour</button>
+
+      <div class="card" style="background:var(--grad); border:none; color:var(--white);">
+        <div class="row"><span class="k" style="color:rgba(255,255,255,0.85);">Vols suivis</span><span class="v" id="rw-flights" style="color:var(--white);">0</span></div>
+        <div class="row"><span class="k" style="color:rgba(255,255,255,0.85);">Destinations différentes</span><span class="v" id="rw-destinations" style="color:var(--white);">0</span></div>
+        <div class="row"><span class="k" style="color:rgba(255,255,255,0.85);">Kilomètres parcourus</span><span class="v" id="rw-km" style="color:var(--white);">0 km</span></div>
+      </div>
+
+      <div class="section-title">Tes badges</div>
+      <div class="badge-grid" id="badge-grid"></div>
+    </div>
+
+    <!-- MODALE DÉTAIL BADGE -->
+    <div id="badge-modal-overlay" class="badge-modal-overlay" style="display:none;">
+      <div class="badge-modal">
+        <div class="badge-modal-ico" id="bm-ico">🏅</div>
+        <div class="badge-modal-name" id="bm-name">—</div>
+        <div class="badge-modal-detail" id="bm-detail">—</div>
+        <button class="full" onclick="closeBadgeModal()">Fermer</button>
+      </div>
+    </div>
+
+    <!-- CHECKLIST -->
+    <div class="screen" id="screen-checklist">
+      <div class="card">
+        <div class="row" style="margin-bottom:8px;">
+          <span class="k">Progression</span>
+          <span class="v" id="check-progress-text">0/0</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="check-progress-fill" style="width:0%;"></div></div>
+        <div id="checklist-items"></div>
+        <div class="add-row">
+          <input type="text" id="new-item" placeholder="Ajouter un élément..." />
+          <button id="add-item-btn">+</button>
+        </div>
+      </div>
+      <div class="ad-banner">
+        <div class="ad-label">Publicité</div>
+        <div class="ad-content">Espace bannière — ex : bagagerie, adaptateurs de voyage</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="navbar">
+    <div class="navitem active" data-screen="accueil"><div class="ico">🏠</div><div class="navlabel">ACCUEIL</div></div>
+    <div class="navitem" data-screen="voyage"><div class="ico">✈️</div><div class="navlabel">VOYAGE</div></div>
+    <div class="navitem" data-screen="checklist"><div class="ico">☑️</div><div class="navlabel">CHECKLIST</div></div>
+    <div class="navitem" data-screen="plus"><div class="ico">⋯</div><div class="navlabel">PLUS</div></div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // ============================================================
+  // PERSISTANCE — Firebase (Auth anonyme + Firestore)
+  // ============================================================
+  // 1. Crée un projet gratuit sur https://console.firebase.google.com
+  // 2. Active "Authentication" > méthode "Anonyme"
+  // 3. Active "Firestore Database" (mode test pour commencer)
+  // 4. Remplace firebaseConfig ci-dessous par la config de TON projet
+  //    (Paramètres du projet > Général > Tes applications > config SDK)
+  const firebaseConfig = {
+    apiKey: "REMPLACE_MOI",
+    authDomain: "REMPLACE_MOI.firebaseapp.com",
+    projectId: "REMPLACE_MOI",
+    storageBucket: "REMPLACE_MOI.appspot.com",
+    messagingSenderId: "REMPLACE_MOI",
+    appId: "REMPLACE_MOI"
+  };
+
+  let db = null, uid = null, saveTimer = null, firebaseReady = false;
+
+  function setSyncStatus(text){ const el = $('sync-status'); if (el) el.textContent = text; }
+
+  function initFirebase(){
+    if (firebaseConfig.apiKey === "REMPLACE_MOI"){
+      setSyncStatus('Non configuré — voir le commentaire dans le code');
+      return;
+    }
+    try{
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      // Mode hors ligne : garde en cache local checklist, budget, documents et
+      // compte pour qu'ils restent consultables sans réseau, avec resynchro
+      // automatique au retour de connexion. Ne couvre pas le statut de vol
+      // en direct (qui a besoin du réseau par nature) ni les vraies photos.
+      db.enablePersistence().catch(err => {
+        if (err.code === 'failed-precondition'){
+          console.warn('Persistance hors ligne indisponible : plusieurs onglets ouverts.');
+        } else if (err.code === 'unimplemented'){
+          console.warn('Persistance hors ligne non supportée par ce navigateur.');
+        }
+      });
+      setSyncStatus('Connexion...');
+      firebase.auth().signInAnonymously().catch(err => setSyncStatus('Erreur auth : ' + err.message));
+      firebase.auth().onAuthStateChanged(user => {
+        if (user){
+          uid = user.uid;
+          firebaseReady = true;
+          loadUserData();
+          registerFcmToken();
+        }
+      });
+    } catch(err){
+      setSyncStatus('Erreur config : ' + err.message);
+    }
+  }
+
+  // Enregistre le jeton FCM de cet appareil dans Firestore, pour que la
+  // Cloud Function serveur sache où envoyer les notifications même app fermée.
+  // NÉCESSITE : avoir renseigné messagingSenderId dans firebaseConfig ci-dessus
+  // et, pour un vrai déploiement web, un fichier firebase-messaging-sw.js
+  // (service worker) à la racine du site. Sans ça, cette fonction échoue
+  // silencieusement et l'app continue de fonctionner en mode "vérification
+  // à l'écran" comme avant.
+  async function registerFcmToken(){
+    try{
+      if (!('Notification' in window)) return;
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+      const messagingInstance = firebase.messaging();
+      const token = await messagingInstance.getToken();
+      if (token){
+        await db.collection('users').doc(uid).set({ fcmToken: token }, { merge: true });
+      }
+    } catch(err){
+      console.warn('Jeton FCM non disponible (normal en test local sans service worker) :', err.message);
+    }
+
+  async function loadUserData(){
+    setSyncStatus('Chargement...');
+    try{
+      const doc = await db.collection('users').doc(uid).get();
+      if (doc.exists){
+        const data = doc.data();
+        if (data.checklist) checklist = data.checklist;
+        if (data.expenses) expenses = data.expenses;
+        if (typeof data.isPremium === 'boolean'){ isPremium = data.isPremium; if (typeof applyPremiumUI === 'function') applyPremiumUI(); }
+        if (data.badgeUnlockDetails) badgeUnlockDetails = data.badgeUnlockDetails;
+        if (data.lastFlightContext) lastFlightContext = data.lastFlightContext;
+        if (data.stats){ stats = Object.assign({ flightsCount:0, totalKm:0, destinations:[], checklistCompleted:false, luggageDocumented:false }, data.stats); if (typeof renderBadges === 'function') renderBadges(); }
+        if (data.account){
+          $('acc-name').value = data.account.name || '';
+          $('acc-email').value = data.account.email || '';
+          if (data.account.name) $('avatarInitial').textContent = data.account.name[0].toUpperCase();
+        }
+        if (data.lastFlight){
+          $('flightNo').value = data.lastFlight.flightNo || '';
+          $('flightDate').value = data.lastFlight.date || '';
+        }
+        renderChecklist();
+        renderBudget();
+      }
+      setSyncStatus('Synchronisé ✓');
+    } catch(err){
+      setSyncStatus('Erreur lecture : ' + err.message);
+    }
+  }
+
+  // Sauvegarde groupée et différée (évite un appel réseau à chaque frappe)
+  function scheduleSave(){
+    if (!firebaseReady) return;
+    setSyncStatus('Enregistrement...');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try{
+        await db.collection('users').doc(uid).set({
+          checklist,
+          expenses,
+          isPremium: typeof isPremium !== 'undefined' ? isPremium : false,
+          stats: typeof stats !== 'undefined' ? stats : null,
+          badgeUnlockDetails: typeof badgeUnlockDetails !== 'undefined' ? badgeUnlockDetails : {},
+          lastFlightContext: typeof lastFlightContext !== 'undefined' ? lastFlightContext : null,
+          account: { name: $('acc-name').value, email: $('acc-email').value },
+          lastFlight: { flightNo: $('flightNo').value, date: $('flightDate').value },
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        setSyncStatus('Synchronisé ✓');
+      } catch(err){
+        setSyncStatus('Erreur écriture : ' + err.message);
+      }
+    }, 800);
+  }
+</script>
+<script>
+  const titles = { accueil:['Tabifly','Ton compagnon de voyage'], voyage:['Voyage','Suivi de ton vol en temps réel'], bagages:['Bagages','Photos de référence'], checklist:['Checklist','Avant de prendre l\'avion'], compte:['Compte','Ton profil'], plus:['Plus','Tous les modules'], documents:['Documents','Tes documents de voyage'], budget:['Devise & budget','Convertisseur et dépenses'], correspondances:['Correspondances','Tes vols suivants'], traduction:['Traduction','Demander son chemin'], filvol:['Fil de vol','Anonyme et éphémère'], premium:['Premium','Débloque tout'], recompenses:['Récompenses','Tes badges de voyageur'] };
+
+  const subScreensOfPlus = ['documents','budget','correspondances','traduction','bagages','compte','filvol','recompenses'];
+  let currentScreen = 'accueil';
+  let unreadCounts = { filvol: 0, recompenses: 0 };
+
+  function updateUnreadUI(){
+    ['filvol','recompenses'].forEach(key => {
+      const el = $('unread-' + key);
+      if (!el) return;
+      if (unreadCounts[key] > 0){ el.textContent = unreadCounts[key]; el.style.display = 'flex'; }
+      else { el.style.display = 'none'; }
+    });
+  }
+
+  function goTo(screen){
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    $('screen-' + screen).classList.add('active');
+    const navTarget = subScreensOfPlus.includes(screen) ? 'plus' : screen;
+    document.querySelectorAll('.navitem').forEach(n => n.classList.toggle('active', n.dataset.screen === navTarget));
+    $('topbarTitle').textContent = titles[screen][0];
+    $('topbarSub').textContent = titles[screen][1];
+    currentScreen = screen;
+    if (screen === 'filvol' || screen === 'recompenses'){
+      unreadCounts[screen] = 0;
+      updateUnreadUI();
+    }
+  }
+  document.querySelectorAll('.navitem').forEach(n => n.addEventListener('click', () => goTo(n.dataset.screen)));
+
+  // --- COMPTE ---
+  $('acc-save').addEventListener('click', () => {
+    const name = $('acc-name').value.trim();
+    if (name) $('avatarInitial').textContent = name[0].toUpperCase();
+    scheduleSave();
+  });
+
+  // Suppression de compte — exigence obligatoire du Play Store pour toute
+  // app proposant un compte utilisateur (données stockées côté serveur).
+  $('delete-account-btn').addEventListener('click', async () => {
+    const confirmed = confirm('Supprimer définitivement ton compte et toutes tes données ? Cette action est irréversible.');
+    if (!confirmed) return;
+    try{
+      if (firebaseReady && uid){
+        await db.collection('users').doc(uid).delete();
+      }
+      const user = firebase.auth().currentUser;
+      if (user) await user.delete();
+      alert('Ton compte et tes données ont été supprimés.');
+      window.location.reload();
+    } catch(err){
+      alert('Erreur lors de la suppression : ' + err.message + '\nRéessaie, ou contacte le support si le problème persiste.');
+    }
+  });
+
+  // --- BAGAGES ---
+  function setupPhotoCapture(inputId, btnId, wrapId){
+    const input = $(inputId), btn = $(btnId), wrap = $(wrapId);
+    btn.addEventListener('click', () => input.click());
+    input.addEventListener('change', () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        wrap.innerHTML = `<img src="${e.target.result}" style="width:100%; border-radius:12px; display:block;" />
+          <div class="note" style="margin-top:6px;">${file.name} — ${new Date().toLocaleString('fr-FR')}</div>`;
+        updateLuggageStatus();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  function updateLuggageStatus(){
+    const hasLuggage = $('luggage-preview-wrap').querySelector('img');
+    const hasTag = $('tag-preview-wrap').querySelector('img');
+    $('luggage-status').textContent = hasLuggage && hasTag ? 'Dossier complet ✓' : hasLuggage || hasTag ? 'Partiel — 1/2 photo' : 'Non enregistré';
+    if (hasLuggage && hasTag && typeof stats !== 'undefined'){ stats.luggageDocumented = true; if (typeof renderBadges === 'function') renderBadges(); scheduleSave(); }
+  }
+  setupPhotoCapture('luggage-photo', 'luggage-photo-btn', 'luggage-preview-wrap');
+  setupPhotoCapture('tag-photo', 'tag-photo-btn', 'tag-preview-wrap');
+
+  // --- DOCUMENTS DE VOYAGE ---
+  let documents = [];
+  function renderDocuments(){
+    const wrap = $('documents-list');
+    wrap.innerHTML = documents.length ? '' : '<div class="note">Aucun document ajouté pour l\'instant.</div>';
+    documents.forEach((doc, i) => {
+      const row = document.createElement('div');
+      row.className = 'list-row';
+      row.style.cursor = 'default';
+      row.innerHTML = `<div class="ico-badge">📄</div><div><div class="label">${doc.name}</div><div class="meta">${doc.date}</div></div>`;
+      wrap.appendChild(row);
+    });
+  }
+  $('doc-add-btn').addEventListener('click', () => $('doc-file').click());
+  $('doc-file').addEventListener('change', () => {
+    const file = $('doc-file').files[0];
+    if (!file) return;
+    documents.push({ name: file.name, date: new Date().toLocaleDateString('fr-FR') });
+    renderDocuments();
+  });
+  renderDocuments();
+
+  // --- DEVISE ET BUDGET ---
+  let fxRatesCache = {}; // { USD: 1.08, GBP: 0.86, ... } — rafraîchi une fois par session
+  let fxCacheDate = null;
+
+  async function getFxRates(){
+    const today = new Date().toDateString();
+    if (fxCacheDate === today && Object.keys(fxRatesCache).length) return fxRatesCache; // évite un appel réseau à chaque frappe
+    const res = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,JPY,CAD');
+    if (!res.ok) throw new Error('Erreur API taux de change');
+    const data = await res.json();
+    fxRatesCache = data.rates;
+    fxCacheDate = today;
+    return fxRatesCache;
+  }
+
+  async function updateFx(){
+    const amount = parseFloat($('fx-amount').value) || 0;
+    const currency = $('fx-currency').value;
+    try{
+      const rates = await getFxRates();
+      const rate = rates[currency];
+      $('fx-result').textContent = `${(amount * rate).toFixed(2)} ${currency}`;
+      $('fx-note').textContent = 'Taux en temps réel via l\'API Frankfurter (mise à jour quotidienne, source BCE).';
+    } catch(err){
+      $('fx-result').textContent = '—';
+      $('fx-note').textContent = '⚠️ Taux de change indisponible hors ligne ou en cas d\'erreur réseau.';
+    }
+  }
+  $('fx-amount').addEventListener('input', updateFx);
+  $('fx-currency').addEventListener('change', updateFx);
+  updateFx();
+
+  let expenses = [];
+  function renderBudget(){
+    const wrap = $('budget-list');
+    wrap.innerHTML = '';
+    expenses.forEach(e => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<span class="k">${e.label}</span><span class="v" style="font-size:13px;">${e.amount.toFixed(2)} €</span>`;
+      wrap.appendChild(row);
+    });
+    const total = expenses.reduce((s, e) => s + e.amount, 0);
+    $('budget-total').textContent = `${total.toFixed(2)} €`;
+  }
+  $('budget-add-btn').addEventListener('click', () => {
+    const label = $('budget-label').value.trim();
+    const amount = parseFloat($('budget-amount').value);
+    if (!label || isNaN(amount)) return;
+    expenses.push({ label, amount });
+    $('budget-label').value = ''; $('budget-amount').value = '';
+    renderBudget();
+    scheduleSave();
+  });
+  renderBudget();
+
+  // --- CORRESPONDANCES ---
+  let correspondances = [];
+  function renderCorrespondances(){
+    const wrap = $('corr-list');
+    wrap.innerHTML = correspondances.length ? '' : '';
+    correspondances.forEach((c, i) => {
+      const row = document.createElement('div');
+      row.className = 'card';
+      row.innerHTML = `<div class="row"><span class="k">Vol</span><span class="v">${c.flightNo}</span></div><div class="row"><span class="k">Date</span><span class="v" style="font-size:13px;">${c.date}</span></div>`;
+      wrap.appendChild(row);
+    });
+  }
+  $('corr-add-btn').addEventListener('click', () => {
+    const flightNo = $('corr-flightno').value.trim().toUpperCase();
+    const date = $('corr-date').value;
+    if (!flightNo) return;
+    correspondances.push({ flightNo, date });
+    $('corr-flightno').value = ''; $('corr-date').value = '';
+    renderCorrespondances();
+  });
+  renderCorrespondances();
+
+  // --- TRADUCTION ---
+  const phrasesFR = [
+    { key:'gate', fr:(g) => `Où est la porte ${g || '...'} ?` },
+    { key:'boarding', fr:() => 'Où est la salle d\'embarquement ?' },
+    { key:'toilets', fr:() => 'Où sont les toilettes ?' },
+    { key:'help', fr:() => 'Pouvez-vous m\'aider, s\'il vous plaît ?' },
+    { key:'thanks', fr:() => 'Merci beaucoup.' }
+  ];
+  const translations = {
+    en: { gate:(g)=>`Where is gate ${g||'...'}?`, boarding:'Where is the boarding area?', toilets:'Where are the restrooms?', help:'Can you help me, please?', thanks:'Thank you very much.' },
+    es: { gate:(g)=>`¿Dónde está la puerta ${g||'...'}?`, boarding:'¿Dónde está la sala de embarque?', toilets:'¿Dónde están los baños?', help:'¿Puede ayudarme, por favor?', thanks:'Muchas gracias.' },
+    it: { gate:(g)=>`Dov'è il gate ${g||'...'}?`, boarding:'Dov\'è la sala d\'imbarco?', toilets:'Dove sono i bagni?', help:'Può aiutarmi, per favore?', thanks:'Grazie mille.' },
+    de: { gate:(g)=>`Wo ist Gate ${g||'...'}?`, boarding:'Wo ist der Boarding-Bereich?', toilets:'Wo sind die Toiletten?', help:'Können Sie mir bitte helfen?', thanks:'Vielen Dank.' }
+  };
+  function renderPhrases(){
+    const lang = $('tr-lang').value;
+    const gate = $('tr-gate').value.trim();
+    const wrap = $('tr-phrases');
+    wrap.innerHTML = '';
+    phrasesFR.forEach(p => {
+      const frText = p.fr(gate);
+      const trValue = translations[lang][p.key];
+      const trText = typeof trValue === 'function' ? trValue(gate) : trValue;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.marginBottom = '8px';
+      card.style.cursor = 'pointer';
+      card.innerHTML = `<div class="note" style="margin-top:0; margin-bottom:6px;">${frText}</div><div style="font-family:'Space Grotesk',sans-serif; font-size:18px; font-weight:700;">${trText}</div>`;
+      wrap.appendChild(card);
+    });
+  }
+  $('tr-lang').addEventListener('change', renderPhrases);
+  $('tr-gate').addEventListener('input', renderPhrases);
+  renderPhrases();
+
+  // --- FIL DE VOL PARTAGÉ ---
+  const myPseudo = 'Passager ' + Math.floor(100 + Math.random() * 900);
+  let fvMessages = [
+    { pseudo: 'Passager 214', time: '13:12', text: 'La file sécurité côté C est plus rapide en ce moment 👍' },
+    { pseudo: 'Passager 077', time: '13:20', text: 'Quelqu\'un sait si le vol part bien à l\'heure ? Écran d\'affichage pas encore à jour.' }
+  ];
+
+  // Filtre basique : bloque les tentatives de partage de coordonnées personnelles
+  function containsPersonalInfo(text){
+    const phonePattern = /(\+?\d[\s.-]?){6,}/; // séquences de 6+ chiffres
+    const handlePattern = /@\w{2,}/; // @pseudo type réseau social
+    const socialWords = /(whatsapp|instagram|snapchat|telegram|facebook|numero|téléphone|whatsap)/i;
+    return phonePattern.test(text) || handlePattern.test(text) || socialWords.test(text);
+  }
+
+  function renderFvMessages(){
+    const wrap = $('fv-messages');
+    wrap.innerHTML = '';
+    fvMessages.forEach((m, i) => {
+      const el = document.createElement('div');
+      el.className = 'fv-msg';
+      el.innerHTML = `
+        <div class="fv-msg-head"><span class="fv-pseudo">${m.pseudo}</span><span class="fv-time">${m.time}</span></div>
+        <div class="fv-text">${m.text}</div>
+        <div class="fv-report" data-i="${i}">Signaler</div>
+      `;
+      el.querySelector('.fv-report').addEventListener('click', () => {
+        alert('Message signalé. Il sera masqué et examiné (comportement simulé pour le MVP).');
+        fvMessages.splice(i, 1);
+        renderFvMessages();
+      });
+      wrap.appendChild(el);
+    });
+  }
+
+  $('fv-send-btn').addEventListener('click', () => {
+    const val = $('fv-input').value.trim();
+    const warning = $('fv-warning');
+    if (!val) return;
+    if (containsPersonalInfo(val)){
+      warning.style.display = 'block';
+      warning.textContent = '⚠️ Message bloqué : le partage de numéro de téléphone ou de réseau social n\'est pas autorisé sur le fil.';
+      return;
+    }
+    warning.style.display = 'none';
+    fvMessages.push({ pseudo: myPseudo, time: new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}), text: val });
+    $('fv-input').value = '';
+    renderFvMessages();
+  });
+
+  function updateFvFlightNo(){
+    const flightNo = $('flightNo').value.trim().toUpperCase();
+    $('fv-flightno').textContent = flightNo || 'Renseigne un vol dans l\'onglet Voyage';
+  }
+  updateFvFlightNo();
+  renderFvMessages();
+
+  // Démo : simule l'arrivée d'un message d'un autre passager après un délai,
+  // pour illustrer le badge de notification sur "Fil de vol partagé"
+  setTimeout(() => {
+    fvMessages.push({ pseudo: 'Passager 305', time: new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}), text: 'Embarquement annoncé, ça avance bien côté porte 👌' });
+    renderFvMessages();
+    if (currentScreen !== 'filvol'){ unreadCounts.filvol += 1; updateUnreadUI(); }
+  }, 15000);
+
+  // --- PREMIUM / FREEMIUM ---
+  let isPremium = false;
+
+  function applyPremiumUI(){
+    $('premium-status').textContent = isPremium ? 'Premium actif ✓' : 'Gratuit (avec pub)';
+    $('premium-toggle-btn').textContent = isPremium ? 'Revenir en Gratuit (démo)' : 'Passer en Premium (démo — 4,99€/mois)';
+    document.querySelectorAll('.ad-banner').forEach(el => el.style.display = isPremium ? 'none' : 'block');
+    $('traduction-locked').style.display = isPremium ? 'none' : 'block';
+    $('traduction-content').style.display = isPremium ? 'block' : 'none';
+    $('filvol-locked').style.display = isPremium ? 'none' : 'block';
+    $('filvol-content').style.display = isPremium ? 'block' : 'none';
+  }
+  $('premium-toggle-btn').addEventListener('click', () => {
+    isPremium = !isPremium;
+    applyPremiumUI();
+    scheduleSave();
+  });
+  applyPremiumUI();
+
+  // --- RÉCOMPENSES / BADGES ---
+  let stats = { flightsCount: 0, totalKm: 0, destinations: [], checklistCompleted: false, luggageDocumented: false };
+  let badgeUnlockDetails = {}; // { badgeId: "texte expliquant le déblocage" }
+  let lastFlightContext = null; // { flightNo, date, origin, destination }
+
+  const distanceTable = {
+    'CDG-JFK': 5837, 'JFK-CDG': 5837, 'CDG-LAX': 9124, 'CDG-NRT': 9714,
+    'CDG-DXB': 5240, 'CDG-BKK': 9540, 'CDG-MRS': 660, 'MRS-CDG': 660,
+    'CDG-BCN': 830, 'BCN-CDG': 830, 'CDG-FCO': 1100, 'FCO-CDG': 1100,
+    'CDG-LIS': 1450, 'LIS-CDG': 1450, 'CDG-MAD': 1050, 'MAD-CDG': 1050,
+    'CDG-LHR': 340, 'LHR-CDG': 340, 'CDG-YUL': 5520, 'YUL-CDG': 5520,
+    'CDG-SIN': 10740, 'SIN-CDG': 10740, 'CDG-SYD': 16970, 'SYD-CDG': 16970
+  };
+  function estimateDistance(origin, dest){
+    const key = `${origin}-${dest}`;
+    if (distanceTable[key]) return distanceTable[key];
+    return 1500; // estimation par défaut pour une destination inconnue
+  }
+
+  const badgeDefs = [
+    { id:'first', ico:'🛫', name:'Premier envol', req:'1 vol suivi', check:() => stats.flightsCount >= 1 },
+    { id:'five', ico:'☁️', name:'Habitué du ciel', req:'5 vols suivis', check:() => stats.flightsCount >= 5 },
+    { id:'twenty', ico:'🧭', name:'Grand voyageur', req:'20 vols suivis', check:() => stats.flightsCount >= 20 },
+    { id:'fifty', ico:'🏆', name:'Légende du tarmac', req:'50 vols suivis', check:() => stats.flightsCount >= 50 },
+    { id:'km1000', ico:'📍', name:'1 000 km parcourus', req:'1 000 km cumulés', check:() => stats.totalKm >= 1000 },
+    { id:'km10000', ico:'🌏', name:'Longue distance', req:'10 000 km cumulés', check:() => stats.totalKm >= 10000 },
+    { id:'km40000', ico:'🌍', name:'Tour du monde', req:'40 000 km cumulés', check:() => stats.totalKm >= 40000 },
+    { id:'explorer', ico:'🗺️', name:'Explorateur', req:'3 destinations différentes', check:() => stats.destinations.length >= 3 },
+    { id:'checklist', ico:'☑️', name:'Checklist parfaite', req:'Checklist 100% complétée', check:() => stats.checklistCompleted },
+    { id:'luggage', ico:'🧳', name:'Bagage prêt', req:'Photos bagage + tag enregistrées', check:() => stats.luggageDocumented }
+  ];
+
+  function renderBadges(){
+    $('rw-flights').textContent = stats.flightsCount;
+    $('rw-destinations').textContent = stats.destinations.length;
+    $('rw-km').textContent = `${stats.totalKm.toLocaleString('fr-FR')} km`;
+    const grid = $('badge-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    badgeDefs.forEach(b => {
+      const unlocked = b.check();
+      if (unlocked && !badgeUnlockDetails[b.id]){
+        // Nouveau déblocage : on fige le contexte et on notifie
+        badgeUnlockDetails[b.id] = buildUnlockDetail(b.id);
+        notify('🏅 Badge débloqué !', `${b.name} — ${badgeUnlockDetails[b.id]}`);
+        if (currentScreen !== 'recompenses'){ unreadCounts.recompenses += 1; updateUnreadUI(); }
+      }
+      const el = document.createElement('div');
+      el.className = 'badge-card' + (unlocked ? '' : ' locked');
+      el.innerHTML = `<div class="badge-ico">${unlocked ? b.ico : '🔒'}</div><div class="badge-name">${b.name}</div><div class="badge-req">${b.req}</div>`;
+      el.addEventListener('click', () => openBadgeModal(b, unlocked));
+      grid.appendChild(el);
+    });
+  }
+
+  function buildUnlockDetail(id){
+    const fc = lastFlightContext;
+    const dateStr = fc?.date ? new Date(fc.date).toLocaleDateString('fr-FR') : 'aujourd\'hui';
+    switch(id){
+      case 'first': return fc ? `Débloqué grâce à votre vol du ${dateStr} vers ${fc.destination}.` : 'Débloqué grâce à votre premier vol suivi.';
+      case 'five': return fc ? `Débloqué après votre 5e vol suivi, le ${dateStr} vers ${fc.destination}.` : 'Débloqué après 5 vols suivis.';
+      case 'twenty': return fc ? `Débloqué après votre 20e vol suivi, le ${dateStr} vers ${fc.destination}.` : 'Débloqué après 20 vols suivis.';
+      case 'fifty': return fc ? `Débloqué après votre 50e vol suivi, le ${dateStr} vers ${fc.destination}.` : 'Débloqué après 50 vols suivis.';
+      case 'km1000': return `Débloqué en dépassant 1 000 km cumulés${fc ? ` avec votre vol vers ${fc.destination}` : ''}.`;
+      case 'km10000': return `Débloqué en dépassant 10 000 km cumulés${fc ? ` avec votre vol vers ${fc.destination}` : ''}.`;
+      case 'km40000': return `Débloqué en dépassant 40 000 km cumulés — l'équivalent d'un tour du monde !`;
+      case 'explorer': return `Débloqué avec votre 3e destination différente : ${stats.destinations.map(d => d.split('-')[1]).join(', ')}.`;
+      case 'checklist': return `Débloqué en cochant 100% de votre checklist avant le départ.`;
+      case 'luggage': return `Débloqué en enregistrant les photos de votre bagage et de son tag.`;
+      default: return 'Débloqué !';
+    }
+  }
+
+  function openBadgeModal(b, unlocked){
+    $('bm-ico').textContent = unlocked ? b.ico : '🔒';
+    $('bm-name').textContent = b.name;
+    $('bm-detail').textContent = unlocked ? badgeUnlockDetails[b.id] : `Pas encore débloqué — condition : ${b.req}.`;
+    $('badge-modal-overlay').style.display = 'flex';
+  }
+  function closeBadgeModal(){ $('badge-modal-overlay').style.display = 'none'; }
+  renderBadges();
+
+  // --- PAGE PREMIUM (toggle formule + CTA) ---
+  let selectedPlan = 'monthly';
+  function selectPlan(plan){
+    selectedPlan = plan;
+    $('plan-monthly').classList.toggle('active', plan === 'monthly');
+    $('plan-yearly').classList.toggle('active', plan === 'yearly');
+    if (plan === 'monthly'){
+      $('plan-price').innerHTML = '4,99€<span>/mois</span>';
+      $('plan-note').textContent = '7 jours offerts, puis sans engagement';
+    } else {
+      $('plan-price').innerHTML = '39,99€<span>/an</span>';
+      $('plan-note').textContent = '7 jours offerts, puis 3,33€/mois — 2 mois économisés';
+    }
+  }
+  $('premium-cta-btn').addEventListener('click', () => {
+    isPremium = true;
+    applyPremiumUI();
+    scheduleSave();
+    $('premium-cta-btn').textContent = '✓ Premium activé';
+    setTimeout(() => goTo('accueil'), 900);
+  });
+
+  // --- CHECKLIST ---
+  const defaultItems = [
+    'Passeport / carte d\'identité',
+    'Billet d\'avion / carte d\'embarquement',
+    'Check-in en ligne effectué',
+    'Chargeur + batterie externe',
+    'Adaptateur de prise',
+    'Liquides ≤ 100ml dans un sac transparent',
+    'Assurance voyage',
+    'Copie des réservations (hôtel, transport)'
+  ];
+  let checklist = defaultItems.map((text, i) => ({ id: i, text, done: false }));
+
+  function renderChecklist(){
+    const container = $('checklist-items');
+    container.innerHTML = '';
+    checklist.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'check-item' + (item.done ? ' done' : '');
+      row.innerHTML = `<input type="checkbox" ${item.done ? 'checked' : ''} data-id="${item.id}"><span>${item.text}</span>`;
+      row.querySelector('input').addEventListener('change', (e) => {
+        item.done = e.target.checked;
+        renderChecklist();
+        scheduleSave();
+      });
+      container.appendChild(row);
+    });
+    const done = checklist.filter(i => i.done).length;
+    const total = checklist.length;
+    $('check-progress-text').textContent = `${done}/${total}`;
+    $('check-progress-fill').style.width = total ? `${(done/total)*100}%` : '0%';
+    $('home-check-n').textContent = `${done}/${total}`;
+    if (typeof stats !== 'undefined'){
+      stats.checklistCompleted = total > 0 && done === total;
+      if (typeof renderBadges === 'function') renderBadges();
+    }
+  }
+  $('add-item-btn').addEventListener('click', () => {
+    const val = $('new-item').value.trim();
+    if (!val) return;
+    checklist.push({ id: Date.now(), text: val, done: false });
+    $('new-item').value = '';
+    renderChecklist();
+    scheduleSave();
+  });
+  renderChecklist();
+
+  // --- VOYAGE (suivi de vol) ---
+  let lastGate = null, pollTimer = null, simTicks = 0;
+  const POLL_INTERVAL_MS = 30000;
+
+  function addLog(msg){
+    const line = document.createElement('div');
+    line.textContent = `[${new Date().toLocaleTimeString('fr-FR')}] ${msg}`;
+    $('log').prepend(line);
+  }
+  function requestNotifPermission(){
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+  }
+  function notify(title, body){
+    addLog(`🔔 ${title} — ${body}`);
+    if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body });
+    else alert(`${title}\n${body}`);
+  }
+  async function fetchFlightStatus(flightNo, date, apiKey){
+    if (apiKey && apiKey.trim().length > 0){
+      const url = `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(flightNo)}/${date}`;
+      const res = await fetch(url, { headers: { 'X-RapidAPI-Key': apiKey, 'X-RapidAPI-Host': 'aerodatabox.p.rapidapi.com' } });
+      if (!res.ok) throw new Error(`Erreur API (${res.status})`);
+      const data = await res.json();
+      const f = Array.isArray(data) ? data[0] : data;
+      return {
+        flightNo, status: f?.status || 'Inconnu', terminal: f?.departure?.terminal || '—', gate: f?.departure?.gate || '—',
+        boardingTime: f?.departure?.scheduledTime?.local || '—',
+        origin: f?.departure?.airport?.iata || '—', destination: f?.arrival?.airport?.iata || '—',
+        depTime: f?.departure?.scheduledTime?.local?.slice(11,16) || '—', arrTime: f?.arrival?.scheduledTime?.local?.slice(11,16) || '—'
+      };
+    }
+    simTicks++;
+    const gateChanged = simTicks === 3;
+    return { flightNo, status: 'À l\'heure', terminal: '2E', gate: gateChanged ? 'B34' : 'B12', boardingTime: '14:35', origin: 'CDG', destination: 'JFK', depTime: '13:06', arrTime: '16:59' };
+  }
+  function updateWalkTime(){ $('walkTime').textContent = `${parseInt($('position').value,10)} min`; }
+  $('position').addEventListener('change', updateWalkTime);
+
+  async function checkFlight(){
+    const flightNo = $('flightNo').value.trim().toUpperCase();
+    const date = $('flightDate').value;
+    const apiKey = $('apiKey').value;
+    try{
+      const data = await fetchFlightStatus(flightNo, date, apiKey);
+      $('fc-flight').textContent = data.flightNo;
+      $('fc-status').textContent = data.status;
+      $('fc-terminal').textContent = data.terminal;
+      $('fc-gate').textContent = data.gate;
+      $('fc-time').textContent = data.boardingTime;
+      $('fh-origin').textContent = data.origin;
+      $('fh-dest').textContent = data.destination;
+      $('fh-dep').textContent = data.depTime;
+      $('fh-arr').textContent = data.arrTime;
+      $('home-flight').textContent = data.flightNo;
+      $('home-flightno').textContent = `Porte ${data.gate} · ${data.boardingTime}`;
+      $('home-status').textContent = data.status;
+
+      if (lastGate === null){ lastGate = data.gate; addLog(`Suivi démarré — porte actuelle : ${data.gate}`);
+        // Comptabilise ce vol pour les récompenses (une seule fois, au démarrage du suivi)
+        stats.flightsCount += 1;
+        const dist = estimateDistance(data.origin, data.destination);
+        stats.totalKm += dist;
+        const destKey = `${data.origin}-${data.destination}`;
+        if (!stats.destinations.includes(destKey)) stats.destinations.push(destKey);
+        lastFlightContext = { flightNo: data.flightNo, date: date || new Date().toISOString().slice(0,10), origin: data.origin, destination: data.destination };
+        renderBadges();
+        scheduleSave();
+      }
+      else if (data.gate !== lastGate){
+        $('fc-status').className = 'status-pill alert';
+        $('home-status').className = 'status-pill alert';
+        notify('Porte changée', `${lastGate} → ${data.gate}. Vérifie ton temps de marche.`);
+        lastGate = data.gate;
+      } else { addLog(`Vérification OK — porte inchangée (${data.gate})`); }
+    } catch(err){ addLog(`Erreur : ${err.message}`); }
+  }
+  $('startBtn').addEventListener('click', () => {
+    if (!$('flightNo').value.trim()){ alert('Renseigne un numéro de vol.'); return; }
+    requestNotifPermission();
+    $('flight-hero').style.display = 'block';
+    $('flight-card').style.display = 'block';
+    $('position-card').style.display = 'block';
+    $('log-card').style.display = 'block';
+    $('startBtn').disabled = true;
+    updateWalkTime();
+    checkFlight();
+    pollTimer = setInterval(checkFlight, POLL_INTERVAL_MS);
+    // Signale à la Cloud Function côté serveur qu'un vol est à surveiller,
+    // pour qu'elle prenne le relais même app fermée.
+    if (firebaseReady) db.collection('users').doc(uid).set({ trackingActive: true }, { merge: true });
+    scheduleSave();
+    updateFvFlightNo();
+  });
+  $('checkNowBtn').addEventListener('click', checkFlight);
+  initFirebase();
+</script>
+</body>
+</html>
